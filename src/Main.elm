@@ -2,9 +2,12 @@ module Main exposing (main)
 
 import Array exposing (Array)
 import Browser
-import Html exposing (Html, button, div, input, main_, text)
-import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
+import Element exposing (Element, centerX, fill, padding, px, rgb255, text, width)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
+import Element.Input as Input
+import Html
 import IP
 
 
@@ -45,7 +48,12 @@ newStaticRoute =
 
 init : Model
 init =
-    Array.fromList [ newStaticRoute ]
+    Array.fromList
+        [ { newStaticRoute
+            | destination =
+                Invalid "0.0.0.0/0" "Enter a classless destination network"
+          }
+        ]
 
 
 
@@ -56,6 +64,8 @@ type Msg
     = ChangeDestination Int String
     | ChangeRouter Int String
     | AddRoute
+    | DeleteRoute Int
+    | ResetRoutes
 
 
 update : Msg -> Model -> Model
@@ -100,66 +110,143 @@ update msg model =
         AddRoute ->
             model |> Array.push newStaticRoute
 
+        DeleteRoute index ->
+            if Array.length model == 1 then
+                model
+
+            else
+                model
+                    |> Array.toIndexedList
+                    |> List.filterMap
+                        (\( i, v ) ->
+                            if i /= index then
+                                Just v
+
+                            else
+                                Nothing
+                        )
+                    |> Array.fromList
+
+        ResetRoutes ->
+            init
+
 
 
 -- VIEW
 
 
-view : Model -> Html Msg
+view : Model -> Html.Html Msg
 view model =
-    main_ []
-        [ model
-            |> Array.foldl viewStaticRoutes []
-            |> div []
-        , button [ onClick AddRoute ] [ text "Add Route" ]
-        ]
+    Element.column [ centerX, padding 20, Element.spacing 20 ]
+        [ Element.indexedTable [ Element.spacing 20 ]
+            { data = Array.toList model
+            , columns =
+                let
+                    inputs =
+                        [ { header = text "Destination"
+                          , width = Element.fillPortion 3
+                          , view = viewDestination
+                          }
+                        , { header = text "Router"
+                          , width = Element.fillPortion 3
+                          , view = viewRouter
+                          }
+                        ]
 
+                    cols =
+                        if Array.length model > 1 then
+                            inputs
+                                ++ [ { header = Element.none
+                                     , width = Element.fillPortion 1
+                                     , view =
+                                        \i _ ->
+                                            Input.button
+                                                [ padding 12
+                                                , Border.rounded 3
+                                                , Background.color (rgb255 196 30 58)
+                                                , Font.color (rgb255 255 255 255)
+                                                ]
+                                                { onPress = Just (DeleteRoute i)
+                                                , label = text "Delete"
+                                                }
+                                     }
+                                   ]
 
-viewStaticRoutes : StaticRoute -> List (Html Msg) -> List (Html Msg)
-viewStaticRoutes route routes =
-    let
-        index =
-            List.length routes
-    in
-    routes
-        ++ [ div []
-                [ viewDestinationInput index route.destination
-                , viewRouterInput index route.router
+                        else
+                            inputs
+                in
+                cols
+            }
+        , Element.row
+            [ Element.spacing 5, Element.alignRight ]
+            [ Input.button
+                [ padding 12
+                , Border.rounded 3
+                , Border.solid
+                , Background.color (rgb255 8 143 143)
+                , Font.color (rgb255 255 255 255)
                 ]
-           ]
+                { onPress = Just AddRoute
+                , label = text "Add Route"
+                }
+            , Input.button
+                [ padding 12
+                , Border.rounded 3
+                , Border.solid
+                , Background.color (rgb255 129 65 65)
+                , Font.color (rgb255 255 255 255)
+                ]
+                { onPress = Just ResetRoutes
+                , label = text "Reset"
+                }
+            ]
+        ]
+        |> Element.layout []
 
 
-viewDestinationInput : Int -> InputField -> Html Msg
-viewDestinationInput index inputField =
+viewDestination : Int -> StaticRoute -> Element Msg
+viewDestination index route =
     let
         attrs =
-            case inputField of
+            case route.destination of
                 Valid val ->
-                    [ value val ]
+                    { text = val, placeholder = Nothing }
 
                 Invalid val errorMessage ->
-                    [ value val, placeholder errorMessage ]
+                    { text = val
+                    , placeholder =
+                        text errorMessage
+                            |> Input.placeholder []
+                            |> Just
+                    }
     in
-    input (onInput (ChangeDestination index) :: attrs) []
+    { onChange = ChangeDestination index
+    , text = attrs.text
+    , label = Input.labelHidden "Destination"
+    , placeholder = attrs.placeholder
+    }
+        |> Input.text [ width (px 200) ]
 
 
-viewRouterInput : Int -> InputField -> Html Msg
-viewRouterInput index inputField =
+viewRouter : Int -> StaticRoute -> Element Msg
+viewRouter index route =
     let
         attrs =
-            case inputField of
+            case route.router of
                 Valid val ->
-                    [ value val ]
+                    { text = val, placeholder = Nothing }
 
                 Invalid val errorMessage ->
-                    [ value val, placeholder errorMessage ]
+                    { text = val
+                    , placeholder =
+                        text errorMessage
+                            |> Input.placeholder []
+                            |> Just
+                    }
     in
-    input
-        (onInput (ChangeRouter index)
-            :: minlength 7
-            :: maxlength 15
-            :: size 15
-            :: pattern "^(?>(\\d|[1-9]\\d{2}|1\\d\\d|2[0-4]\\d|25[0-5])\\.){3}(?1)$"
-            :: attrs
-        )
-        []
+    { onChange = ChangeRouter index
+    , text = attrs.text
+    , label = Input.labelHidden "Router"
+    , placeholder = attrs.placeholder
+    }
+        |> Input.text [ width fill ]
