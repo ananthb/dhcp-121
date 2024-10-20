@@ -21,7 +21,7 @@ jobs:
 
       - name: Build
         run: |
-          elm make --optimize --output=public/index.html src/Main.elm
+          elm make --optimize --output=public/app.js src/Main.elm
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3

@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Array exposing (Array)
 import Browser
+import Browser.Navigation as Nav
 import Element exposing (Element, centerX, fill, padding, px, rgb255, text, width)
 import Element.Background as Background
 import Element.Border as Border
@@ -9,6 +10,7 @@ import Element.Font as Font
 import Element.Input as Input
 import Html
 import IP
+import Url
 
 
 
@@ -17,7 +19,14 @@ import IP
 
 main : Program () Model Msg
 main =
-    Browser.sandbox { init = init, update = update, view = view }
+    Browser.application
+        { init = init
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
+        , subscriptions = subscriptions
+        , update = update
+        , view = view
+        }
 
 
 
@@ -46,9 +55,14 @@ newStaticRoute =
     }
 
 
-init : Model
-init =
+newModel : Model
+newModel =
     Array.fromList [ { newStaticRoute | destination = Valid "0.0.0.0/0" } ]
+
+
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init _ _ _ =
+    ( newModel, Cmd.none )
 
 
 calculateOption121 : Model -> Maybe String
@@ -72,139 +86,169 @@ calculateOption121 model =
 
 
 type Msg
-    = ChangeDestination Int String
+    = UrlChanged Url.Url
+    | LinkClicked Browser.UrlRequest
+    | ChangeDestination Int String
     | ChangeRouter Int String
     | AddRoute
     | DeleteRoute Int
     | ResetRoutes
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        UrlChanged _ ->
+            ( model, Cmd.none )
+
+        LinkClicked _ ->
+            ( model, Cmd.none )
+
         ChangeDestination index value ->
             case Array.get index model of
                 Just route ->
-                    model
-                        |> Array.set index
-                            (if value == "" then
-                                { route
-                                    | destination = Invalid value "Destination cannot be empty"
-                                }
+                    let
+                        changeDestination =
+                            Array.set index
+                                (if value == "" then
+                                    { route
+                                        | destination = Invalid value "Destination cannot be empty"
+                                    }
 
-                             else
-                                {- TODO: Validate destination -}
-                                { route | destination = Valid value }
-                            )
+                                 else
+                                    {- TODO: Validate destination -}
+                                    { route | destination = Valid value }
+                                )
+                    in
+                    ( changeDestination model, Cmd.none )
 
                 Nothing ->
-                    model
+                    ( model, Cmd.none )
 
         ChangeRouter index value ->
             case Array.get index model of
                 Just route ->
-                    model
-                        |> Array.set index
-                            (if value == "" then
-                                { route | router = Invalid value "Router cannot be empty" }
+                    let
+                        changeRouter =
+                            Array.set index
+                                (if value == "" then
+                                    { route | router = Invalid value "Router cannot be empty" }
 
-                             else if IP.validate value then
-                                { route | router = Valid value }
+                                 else if IP.validate value then
+                                    { route | router = Valid value }
 
-                             else
-                                { route | router = Invalid value "Enter a valid IP address" }
-                            )
+                                 else
+                                    { route | router = Invalid value "Enter a valid IP address" }
+                                )
+                    in
+                    ( changeRouter model, Cmd.none )
 
                 Nothing ->
-                    model
+                    ( model, Cmd.none )
 
         AddRoute ->
-            model |> Array.push newStaticRoute
+            ( model |> Array.push newStaticRoute, Cmd.none )
 
         DeleteRoute index ->
             if Array.length model == 1 then
-                model
+                ( model, Cmd.none )
 
             else
-                model
-                    |> Array.toIndexedList
-                    |> List.filterMap
-                        (\( i, v ) ->
-                            if i /= index then
-                                Just v
+                let
+                    deleteRoute =
+                        Array.toIndexedList
+                            >> List.filterMap
+                                (\( i, v ) ->
+                                    if i /= index then
+                                        Just v
 
-                            else
-                                Nothing
-                        )
-                    |> Array.fromList
+                                    else
+                                        Nothing
+                                )
+                            >> Array.fromList
+                in
+                ( deleteRoute model, Cmd.none )
 
         ResetRoutes ->
-            init
+            ( newModel, Cmd.none )
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Sub.none
 
 
 
 -- VIEW
 
 
-view : Model -> Html.Html Msg
+view : Model -> Browser.Document Msg
 view model =
-    Element.column [ centerX, padding 20, Element.spacing 20 ]
-        [ viewOption121 model
-        , Element.indexedTable [ Element.spacing 20 ]
-            { data = Array.toList model
-            , columns =
-                let
-                    inputs =
-                        [ { header = text "Destination"
-                          , width = Element.fillPortion 3
-                          , view = viewDestination
-                          }
-                        , { header = text "Router"
-                          , width = Element.fillPortion 3
-                          , view = viewRouter
-                          }
-                        ]
+    { title = "DHCPv4 Option 121 Calculator"
+    , body =
+        [ Element.column [ centerX, padding 20, Element.spacing 20 ]
+            [ viewOption121 model
+            , Element.indexedTable [ Element.spacing 20 ]
+                { data = Array.toList model
+                , columns =
+                    let
+                        inputs =
+                            [ { header = text "Destination"
+                              , width = Element.fillPortion 3
+                              , view = viewDestination
+                              }
+                            , { header = text "Router"
+                              , width = Element.fillPortion 3
+                              , view = viewRouter
+                              }
+                            ]
 
-                    delete =
-                        { header = Element.none
-                        , width = Element.fillPortion 1
-                        , view = viewDeleteButton
-                        }
+                        delete =
+                            { header = Element.none
+                            , width = Element.fillPortion 1
+                            , view = viewDeleteButton
+                            }
 
-                    cols =
-                        if Array.length model > 1 then
-                            inputs ++ [ delete ]
+                        cols =
+                            if Array.length model > 1 then
+                                inputs ++ [ delete ]
 
-                        else
-                            inputs
-                in
-                cols
-            }
-        , Element.row
-            [ Element.spacing 5, Element.alignRight ]
-            [ Input.button
-                [ padding 12
-                , Border.rounded 3
-                , Border.solid
-                , Background.color (rgb255 8 143 143)
-                , Font.color (rgb255 255 255 255)
-                ]
-                { onPress = Just AddRoute
-                , label = text "Add Route"
+                            else
+                                inputs
+                    in
+                    cols
                 }
-            , Input.button
-                [ padding 12
-                , Border.rounded 3
-                , Border.solid
-                , Background.color (rgb255 129 65 65)
-                , Font.color (rgb255 255 255 255)
+            , Element.row
+                [ Element.spacing 5, Element.alignRight ]
+                [ Input.button
+                    [ padding 12
+                    , Border.rounded 3
+                    , Border.solid
+                    , Background.color (rgb255 8 143 143)
+                    , Font.color (rgb255 255 255 255)
+                    ]
+                    { onPress = Just AddRoute
+                    , label = text "Add Route"
+                    }
+                , Input.button
+                    [ padding 12
+                    , Border.rounded 3
+                    , Border.solid
+                    , Background.color (rgb255 129 65 65)
+                    , Font.color (rgb255 255 255 255)
+                    ]
+                    { onPress = Just ResetRoutes
+                    , label = text "Reset"
+                    }
                 ]
-                { onPress = Just ResetRoutes
-                , label = text "Reset"
-                }
             ]
+            |> Element.layout []
         ]
-        |> Element.layout []
+    }
 
 
 viewOption121 : Model -> Element Msg
