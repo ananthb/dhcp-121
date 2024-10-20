@@ -1,9 +1,10 @@
 module Main exposing (main)
 
+import Array exposing (Array)
 import Browser
-import Html exposing (Html, button, div, form, input, main_, text)
+import Html exposing (Html, button, div, input, main_, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onInput, onSubmit)
+import Html.Events exposing (onClick, onInput)
 import IP
 
 
@@ -20,30 +21,31 @@ main =
 -- MODEL
 
 
-type alias StaticRoute =
-    { destination : String
-    , router : String
-    }
-
-
 type InputField
     = Valid String
     | Invalid String String
 
 
-type alias Model =
-    { routes : List StaticRoute
-    , destination : InputField
+type alias StaticRoute =
+    { destination : InputField
     , router : InputField
+    }
+
+
+type alias Model =
+    Array StaticRoute
+
+
+newStaticRoute : StaticRoute
+newStaticRoute =
+    { destination = Invalid "" "Enter a classless destination network"
+    , router = Invalid "" "Enter a valid IP address"
     }
 
 
 init : Model
 init =
-    { routes = []
-    , destination = Invalid "" "Enter a classless destination network"
-    , router = Invalid "" "Enter a valid IP address"
-    }
+    Array.fromList [ newStaticRoute ]
 
 
 
@@ -51,44 +53,52 @@ init =
 
 
 type Msg
-    = ChangeDestination String
-    | ChangeRouter String
+    = ChangeDestination Int String
+    | ChangeRouter Int String
     | AddRoute
 
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        ChangeDestination value ->
-            if value == "" then
-                { model | destination = Invalid value "Destination cannot be empty" }
+        ChangeDestination index value ->
+            case Array.get index model of
+                Just route ->
+                    model
+                        |> Array.set index
+                            (if value == "" then
+                                { route
+                                    | destination = Invalid value "Destination cannot be empty"
+                                }
 
-            else
-                {- TODO: Validate destination -}
-                { model | destination = Valid value }
+                             else
+                                {- TODO: Validate destination -}
+                                { route | destination = Valid value }
+                            )
 
-        ChangeRouter value ->
-            if value == "" then
-                { model | router = Invalid value "Router cannot be empty" }
+                Nothing ->
+                    model
 
-            else if IP.validate value then
-                { model | router = Valid value }
+        ChangeRouter index value ->
+            case Array.get index model of
+                Just route ->
+                    model
+                        |> Array.set index
+                            (if value == "" then
+                                { route | router = Invalid value "Router cannot be empty" }
 
-            else
-                { model | router = Invalid value "Enter a valid IP address" }
+                             else if IP.validate value then
+                                { route | router = Valid value }
+
+                             else
+                                { route | router = Invalid value "Enter a valid IP address" }
+                            )
+
+                Nothing ->
+                    model
 
         AddRoute ->
-            case ( model.destination, model.router ) of
-                ( Valid destination, Valid router ) ->
-                    { model
-                        | routes = { destination = destination, router = router } :: model.routes
-                        , destination = Invalid "" "Enter a classless destination network"
-                        , router = Invalid "" "Enter a valid IP address"
-                    }
-
-                _ ->
-                    {- TODO: Show error message -}
-                    model
+            model |> Array.push newStaticRoute
 
 
 
@@ -98,17 +108,29 @@ update msg model =
 view : Model -> Html Msg
 view model =
     main_ []
-        [ Html.form [ onSubmit AddRoute ]
-            [ viewDestinationInput model.destination
-            , viewRouterInput model.router
-            , button [ type_ "submit" ] [ text "Add Route" ]
-            ]
-        , div [] (List.map viewRoute model.routes)
+        [ model
+            |> Array.foldl viewStaticRoutes []
+            |> div []
+        , button [ onClick AddRoute ] [ text "Add Route" ]
         ]
 
 
-viewDestinationInput : InputField -> Html Msg
-viewDestinationInput inputField =
+viewStaticRoutes : StaticRoute -> List (Html Msg) -> List (Html Msg)
+viewStaticRoutes route routes =
+    let
+        index =
+            List.length routes
+    in
+    routes
+        ++ [ div []
+                [ viewDestinationInput index route.destination
+                , viewRouterInput index route.router
+                ]
+           ]
+
+
+viewDestinationInput : Int -> InputField -> Html Msg
+viewDestinationInput index inputField =
     let
         attrs =
             case inputField of
@@ -118,11 +140,11 @@ viewDestinationInput inputField =
                 Invalid val errorMessage ->
                     [ value val, placeholder errorMessage ]
     in
-    input (onInput ChangeDestination :: attrs) []
+    input (onInput (ChangeDestination index) :: attrs) []
 
 
-viewRouterInput : InputField -> Html Msg
-viewRouterInput inputField =
+viewRouterInput : Int -> InputField -> Html Msg
+viewRouterInput index inputField =
     let
         attrs =
             case inputField of
@@ -133,7 +155,7 @@ viewRouterInput inputField =
                     [ value val, placeholder errorMessage ]
     in
     input
-        (onInput ChangeRouter
+        (onInput (ChangeRouter index)
             :: minlength 7
             :: maxlength 15
             :: size 15
@@ -141,8 +163,3 @@ viewRouterInput inputField =
             :: attrs
         )
         []
-
-
-viewRoute : StaticRoute -> Html Msg
-viewRoute route =
-    div [] [ div [] [ text route.destination ], div [] [ text route.router ] ]
