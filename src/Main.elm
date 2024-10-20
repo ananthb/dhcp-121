@@ -48,12 +48,23 @@ newStaticRoute =
 
 init : Model
 init =
-    Array.fromList
-        [ { newStaticRoute
-            | destination =
-                Invalid "0.0.0.0/0" "Enter a classless destination network"
-          }
-        ]
+    Array.fromList [ { newStaticRoute | destination = Valid "0.0.0.0/0" } ]
+
+
+calculateOption121 : Model -> Maybe String
+calculateOption121 model =
+    let
+        calc : StaticRoute -> Maybe String -> Maybe String
+        calc route acc =
+            case ( route.destination, route.router ) of
+                ( Valid dest, Valid router ) ->
+                    {- TODO: actually calculate the option 121 -}
+                    Just (router ++ "121 " ++ dest ++ " " ++ router ++ " ")
+
+                _ ->
+                    acc
+    in
+    Array.foldl calc Nothing model
 
 
 
@@ -138,7 +149,8 @@ update msg model =
 view : Model -> Html.Html Msg
 view model =
     Element.column [ centerX, padding 20, Element.spacing 20 ]
-        [ Element.indexedTable [ Element.spacing 20 ]
+        [ viewOption121 model
+        , Element.indexedTable [ Element.spacing 20 ]
             { data = Array.toList model
             , columns =
                 let
@@ -153,24 +165,15 @@ view model =
                           }
                         ]
 
+                    delete =
+                        { header = Element.none
+                        , width = Element.fillPortion 1
+                        , view = viewDeleteButton
+                        }
+
                     cols =
                         if Array.length model > 1 then
-                            inputs
-                                ++ [ { header = Element.none
-                                     , width = Element.fillPortion 1
-                                     , view =
-                                        \i _ ->
-                                            Input.button
-                                                [ padding 12
-                                                , Border.rounded 3
-                                                , Background.color (rgb255 196 30 58)
-                                                , Font.color (rgb255 255 255 255)
-                                                ]
-                                                { onPress = Just (DeleteRoute i)
-                                                , label = text "Delete"
-                                                }
-                                     }
-                                   ]
+                            inputs ++ [ delete ]
 
                         else
                             inputs
@@ -202,6 +205,21 @@ view model =
             ]
         ]
         |> Element.layout []
+
+
+viewOption121 : Model -> Element Msg
+viewOption121 model =
+    let
+        option121 =
+            case calculateOption121 model of
+                Just val ->
+                    text val
+
+                Nothing ->
+                    text "Some routes are invalid"
+    in
+    [ option121 ]
+        |> Element.column [ centerX, padding 20, Element.spacing 20 ]
 
 
 viewDestination : Int -> StaticRoute -> Element Msg
@@ -250,3 +268,16 @@ viewRouter index route =
     , placeholder = attrs.placeholder
     }
         |> Input.text [ width fill ]
+
+
+viewDeleteButton : Int -> StaticRoute -> Element Msg
+viewDeleteButton index _ =
+    Input.button
+        [ padding 12
+        , Border.rounded 3
+        , Background.color (rgb255 196 30 58)
+        , Font.color (rgb255 255 255 255)
+        ]
+        { onPress = Just (DeleteRoute index)
+        , label = text "Delete"
+        }

@@ -15,8 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-
       - uses: JorelAli/setup-elm@v6
         with:
           elm-version: 0.19.1
