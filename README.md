@@ -3,8 +3,6 @@
 Calculate values for the Classless Static Route Option for
 Dynamic Host Configuration Protocol (DHCP) version 4.
 
-Its hosted at [https://ananthb.github.io/dhcp-121/](https://ananthb.github.io/dhcp-121/).
-
 ## Build
 
 Install [Elm](https://elm-lang.org/).
