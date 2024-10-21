@@ -9,6 +9,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Element.Region as Region
 import Url
 
 
@@ -401,61 +402,16 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "DHCPv4 Option 121 Calculator"
     , body =
-        [ Element.column [ centerX, padding 20, Element.spacing 20 ]
+        [ Element.column
+            [ centerX
+            , padding 20
+            , Element.spacing 20
+            , Region.mainContent
+            ]
             [ viewOption121 model
-            , Element.indexedTable [ Element.spacing 20 ]
-                { data = Array.toList model.routes
-                , columns =
-                    let
-                        inputs =
-                            [ { header = text "Destination"
-                              , width = Element.fillPortion 3
-                              , view = viewDestination
-                              }
-                            , { header = text "Router"
-                              , width = Element.fillPortion 3
-                              , view = viewRouter
-                              }
-                            ]
-
-                        delete =
-                            { header = Element.none
-                            , width = Element.fillPortion 1
-                            , view = viewDeleteButton
-                            }
-
-                        cols =
-                            if Array.length model.routes > 1 then
-                                inputs ++ [ delete ]
-
-                            else
-                                inputs
-                    in
-                    cols
-                }
-            , Element.row
-                [ Element.spacing 5, Element.alignRight ]
-                [ Input.button
-                    [ padding 12
-                    , Border.rounded 3
-                    , Border.solid
-                    , Background.color (rgb255 8 143 143)
-                    , Font.color (rgb255 255 255 255)
-                    ]
-                    { onPress = Just AddRoute
-                    , label = text "Add Route"
-                    }
-                , Input.button
-                    [ padding 12
-                    , Border.rounded 3
-                    , Border.solid
-                    , Background.color (rgb255 129 65 65)
-                    , Font.color (rgb255 255 255 255)
-                    ]
-                    { onPress = Just ResetRoutes
-                    , label = text "Reset"
-                    }
-                ]
+            , viewRoutesTable model
+            , viewButtons
+            , viewFooter
             ]
             |> Element.layout []
         ]
@@ -475,6 +431,41 @@ viewOption121 model =
     in
     [ option121 ]
         |> Element.column [ centerX, padding 20, Element.spacing 20 ]
+
+
+viewRoutesTable : Model -> Element Msg
+viewRoutesTable model =
+    Element.indexedTable
+        [ Element.spacing 20 ]
+        { data = Array.toList model.routes
+        , columns =
+            let
+                inputs =
+                    [ { header = text "Destination"
+                      , width = Element.fillPortion 3
+                      , view = viewDestination
+                      }
+                    , { header = text "Router"
+                      , width = Element.fillPortion 3
+                      , view = viewRouter
+                      }
+                    ]
+
+                delete =
+                    { header = Element.none
+                    , width = Element.fillPortion 1
+                    , view = viewDeleteButton
+                    }
+
+                cols =
+                    if Array.length model.routes > 1 then
+                        inputs ++ [ delete ]
+
+                    else
+                        inputs
+            in
+            cols
+        }
 
 
 viewDestination : Int -> StaticRoute -> Element Msg
@@ -536,3 +527,76 @@ viewDeleteButton index _ =
         { onPress = Just (DeleteRoute index)
         , label = text "Delete"
         }
+
+
+viewButtons : Element Msg
+viewButtons =
+    Element.row
+        [ Element.spacing 5, Element.alignRight ]
+        [ Input.button
+            [ padding 12
+            , Border.rounded 3
+            , Border.solid
+            , Background.color (rgb255 8 143 143)
+            , Font.color (rgb255 255 255 255)
+            ]
+            { onPress = Just AddRoute
+            , label = text "Add Route"
+            }
+        , Input.button
+            [ padding 12
+            , Border.rounded 3
+            , Border.solid
+            , Background.color (rgb255 129 65 65)
+            , Font.color (rgb255 255 255 255)
+            ]
+            { onPress = Just ResetRoutes
+            , label = text "Reset"
+            }
+        ]
+
+
+viewFooter : Element Msg
+viewFooter =
+    let
+        linkAttrs =
+            [ Font.color <| rgb255 2 48 32
+            , Font.underline
+            ]
+    in
+    Element.column
+        [ Region.footer
+        , Element.spacing 5
+        , Element.padding 20
+        , Font.size 14
+        , Font.color (rgb255 128 128 128)
+        , Font.light
+        ]
+        [ Element.row []
+            [ text "Made with ❤️ by "
+            , Element.newTabLink
+                linkAttrs
+                { url = "https://devhuman.net"
+                , label = text "Ananth"
+                }
+            , text "."
+            ]
+        , Element.row []
+            [ text "View the source at "
+            , Element.newTabLink
+                linkAttrs
+                { url = "https://github.com/ananthb/dhcp-121"
+                , label = text "github.com/ananthb/dhcp-121"
+                }
+            , text "."
+            ]
+        , Element.row []
+            [ text "Inspired by the Javascript version at "
+            , Element.newTabLink
+                linkAttrs
+                { url = "https://www.medo64.com/2018/01/configuring-classless-static-route-option/"
+                , label = text "medo64.com"
+                }
+            , text "."
+            ]
+        ]
