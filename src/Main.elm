@@ -44,7 +44,11 @@ type alias StaticRoute =
 
 
 type alias Model =
-    Array StaticRoute
+    { key : Nav.Key
+    , url : Url.Url
+    , routes : Array StaticRoute
+    , option121 : Maybe String
+    }
 
 
 newStaticRoute : StaticRoute
@@ -54,29 +58,21 @@ newStaticRoute =
     }
 
 
-newModel : Model
-newModel =
+newStaticRoutes : Array StaticRoute
+newStaticRoutes =
     Array.fromList [ { newStaticRoute | destination = Valid "0.0.0.0/0" "00" } ]
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ _ _ =
-    ( newModel, Cmd.none )
-
-
-calculateOption121 : Model -> Maybe String
-calculateOption121 model =
-    let
-        calc : StaticRoute -> Maybe String -> Maybe String
-        calc route option =
-            case ( option, route.destination, route.router ) of
-                ( Just opt, Valid _ hexDest, Valid _ hexRouter ) ->
-                    Just (opt ++ hexDest ++ hexRouter)
-
-                _ ->
-                    Nothing
-    in
-    Array.foldl calc (Just "") model
+init _ url key =
+    -- TODO: Parse the URL and set the routes
+    ( { key = key
+      , url = url
+      , routes = newStaticRoutes
+      , option121 = Nothing
+      }
+    , Nav.pushUrl key "#"
+    )
 
 
 
@@ -96,14 +92,21 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        UrlChanged _ ->
-            ( model, Cmd.none )
+        UrlChanged url ->
+            ( { model | url = url }
+            , Cmd.none
+            )
 
-        LinkClicked _ ->
-            ( model, Cmd.none )
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
 
         ChangeDestination index value ->
-            case Array.get index model of
+            case Array.get index model.routes of
                 Just route ->
                     let
                         changeDestination =
@@ -114,17 +117,35 @@ update msg model =
                                     }
 
                                  else
-                                    {- TODO: Validate destination -}
-                                    { route | destination = Valid value "" }
+                                    case parseDestination value of
+                                        Just hex ->
+                                            { route | destination = Valid value hex }
+
+                                        Nothing ->
+                                            { route
+                                                | destination =
+                                                    Invalid value "Enter a valid destination network"
+                                            }
                                 )
+
+                        routes =
+                            changeDestination model.routes
+
+                        ( opt121, cmd ) =
+                            updateOption121 model.key routes
                     in
-                    ( changeDestination model, Cmd.none )
+                    ( { model
+                        | routes = routes
+                        , option121 = opt121
+                      }
+                    , cmd
+                    )
 
                 Nothing ->
                     ( model, Cmd.none )
 
         ChangeRouter index value ->
-            case Array.get index model of
+            case Array.get index model.routes of
                 Just route ->
                     let
                         changeRouter =
@@ -140,17 +161,40 @@ update msg model =
                                         Nothing ->
                                             { route | router = Invalid value "Enter a valid IP address" }
                                 )
+
+                        routes =
+                            changeRouter model.routes
+
+                        ( opt121, cmd ) =
+                            updateOption121 model.key routes
                     in
-                    ( changeRouter model, Cmd.none )
+                    ( { model
+                        | routes = routes
+                        , option121 = opt121
+                      }
+                    , cmd
+                    )
 
                 Nothing ->
                     ( model, Cmd.none )
 
         AddRoute ->
-            ( model |> Array.push newStaticRoute, Cmd.none )
+            let
+                routes =
+                    Array.push newStaticRoute model.routes
+
+                ( opt121, cmd ) =
+                    updateOption121 model.key routes
+            in
+            ( { model
+                | routes = routes
+                , option121 = opt121
+              }
+            , cmd
+            )
 
         DeleteRoute index ->
-            if Array.length model == 1 then
+            if Array.length model.routes == 1 then
                 ( model, Cmd.none )
 
             else
@@ -166,16 +210,51 @@ update msg model =
                                         Nothing
                                 )
                             >> Array.fromList
+
+                    routes =
+                        deleteRoute model.routes
+
+                    ( opt121, cmd ) =
+                        updateOption121 model.key routes
                 in
-                ( deleteRoute model, Cmd.none )
+                ( { model
+                    | routes = routes
+                    , option121 = opt121
+                  }
+                , cmd
+                )
 
         ResetRoutes ->
-            ( newModel, Cmd.none )
+            ( { model
+                | routes = newStaticRoutes
+                , option121 = Nothing
+              }
+            , Nav.pushUrl model.key "#"
+            )
+
+
+updateOption121 : Nav.Key -> Array StaticRoute -> ( Maybe String, Cmd Msg )
+updateOption121 key routes =
+    let
+        calc : StaticRoute -> Maybe String -> Maybe String
+        calc route option =
+            case ( option, route.destination, route.router ) of
+                ( Just opt, Valid _ hexDest, Valid _ hexRouter ) ->
+                    Just (opt ++ hexDest ++ hexRouter)
+
+                _ ->
+                    Nothing
+    in
+    case Array.foldl calc (Just "") routes of
+        Just opt ->
+            ( Just opt, Nav.pushUrl key <| "#" ++ opt )
+
+        Nothing ->
+            ( Nothing, Nav.pushUrl key "#" )
 
 
 
-{-
-
+{- Refer this for the function below
 
    function parseNetwork(ip) { //null if empty; "" if error; otherwise hex
      if (ip == "") { return null; }
@@ -225,7 +304,12 @@ update msg model =
 -}
 
 
-{-| TODO
+{-| TODO: Parse this as a subnet instead of a plain IP
+
+We gotta take the subnet into account.
+
+So 10.10.10.0/24 is valid but 10.10.10.1/24 is not.let
+
 -}
 parseDestination : String -> Maybe String
 parseDestination network =
@@ -236,14 +320,30 @@ parseDestination network =
                 |> Maybe.andThen
                     (\cidr ->
                         if cidr > 0 && cidr < 32 then
-                            Just ""
+                            let
+                                pre =
+                                    if cidr < 16 then
+                                        "0"
+
+                                    else
+                                        ""
+
+                                cidrHex =
+                                    pre ++ Base.fromInt Base.b16 cidr
+                            in
+                            netStr
+                                |> parseRouter
+                                |> Maybe.andThen (\hex -> Just (cidrHex ++ hex))
 
                         else
                             Nothing
                     )
 
         [ netStr ] ->
-            Nothing
+            netStr
+                |> parseRouter
+                -- /32 is the default subnet mask which
+                |> Maybe.andThen (\hex -> Just ("20" ++ hex))
 
         _ ->
             Nothing
@@ -304,7 +404,7 @@ view model =
         [ Element.column [ centerX, padding 20, Element.spacing 20 ]
             [ viewOption121 model
             , Element.indexedTable [ Element.spacing 20 ]
-                { data = Array.toList model
+                { data = Array.toList model.routes
                 , columns =
                     let
                         inputs =
@@ -325,7 +425,7 @@ view model =
                             }
 
                         cols =
-                            if Array.length model > 1 then
+                            if Array.length model.routes > 1 then
                                 inputs ++ [ delete ]
 
                             else
@@ -366,7 +466,7 @@ viewOption121 : Model -> Element Msg
 viewOption121 model =
     let
         option121 =
-            case calculateOption121 model of
+            case model.option121 of
                 Just val ->
                     text val
 
