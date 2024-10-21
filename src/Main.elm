@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Array exposing (Array)
+import Base
 import Browser
 import Browser.Navigation as Nav
 import Element exposing (Element, centerX, fill, padding, px, rgb255, text, width)
@@ -8,8 +9,6 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
-import Html
-import IP
 import Url
 
 
@@ -34,7 +33,7 @@ main =
 
 
 type InputField
-    = Valid String
+    = Valid String String
     | Invalid String String
 
 
@@ -57,7 +56,7 @@ newStaticRoute =
 
 newModel : Model
 newModel =
-    Array.fromList [ { newStaticRoute | destination = Valid "0.0.0.0/0" } ]
+    Array.fromList [ { newStaticRoute | destination = Valid "0.0.0.0/0" "00" } ]
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -69,16 +68,15 @@ calculateOption121 : Model -> Maybe String
 calculateOption121 model =
     let
         calc : StaticRoute -> Maybe String -> Maybe String
-        calc route acc =
-            case ( route.destination, route.router ) of
-                ( Valid dest, Valid router ) ->
-                    {- TODO: actually calculate the option 121 -}
-                    Just (router ++ "121 " ++ dest ++ " " ++ router ++ " ")
+        calc route option =
+            case ( option, route.destination, route.router ) of
+                ( Just opt, Valid _ hexDest, Valid _ hexRouter ) ->
+                    Just (opt ++ hexDest ++ hexRouter)
 
                 _ ->
-                    acc
+                    Nothing
     in
-    Array.foldl calc Nothing model
+    Array.foldl calc (Just "") model
 
 
 
@@ -117,7 +115,7 @@ update msg model =
 
                                  else
                                     {- TODO: Validate destination -}
-                                    { route | destination = Valid value }
+                                    { route | destination = Valid value "" }
                                 )
                     in
                     ( changeDestination model, Cmd.none )
@@ -134,11 +132,13 @@ update msg model =
                                 (if value == "" then
                                     { route | router = Invalid value "Router cannot be empty" }
 
-                                 else if IP.validate value then
-                                    { route | router = Valid value }
-
                                  else
-                                    { route | router = Invalid value "Enter a valid IP address" }
+                                    case parseRouter value of
+                                        Just hex ->
+                                            { route | router = Valid value hex }
+
+                                        Nothing ->
+                                            { route | router = Invalid value "Enter a valid IP address" }
                                 )
                     in
                     ( changeRouter model, Cmd.none )
@@ -171,6 +171,117 @@ update msg model =
 
         ResetRoutes ->
             ( newModel, Cmd.none )
+
+
+
+{-
+
+
+   function parseNetwork(ip) { //null if empty; "" if error; otherwise hex
+     if (ip == "") { return null; }
+
+     var subnetSize = 32;
+     var parts = ip.split('/');
+     if (parts.length == 2) {
+       if (/^[0-9]+$/.test(parts[1].trim())) {
+         subnetSize  = parseInt(parts[1], 10);
+         if ((subnetSize < 1) || (subnetSize > 32)) { return ""; }
+       } else {
+         return "";
+       }
+     } else if (parts.length > 2) {
+       return "";
+     }
+
+     var result = ((subnetSize < 16) ? "0" : "") + subnetSize.toString(16);
+
+     var octetCount = parseInt((subnetSize + 7) / 8);
+
+     var octets = parts[0].trim().split('.');
+     if (octets.length != 4) {  return ""; }
+
+     for(var i=0; i<4; i++) {
+       if (/^[0-9]+$/.test(octets[i])) {
+         var octetValue = parseInt(octets[i], 10);
+         if ((octetValue < 0) || (octetValue > 255)) { return ""; }
+         if ((subnetSize > 0) && (subnetSize < 32)) {
+           var octetValueRem = (octetValue << subnetSize) & 0xFF; //remove network bits
+           if (octetValueRem > 0) { return "" ; } //invalid subnet bitmask - some network bits remaining
+           result += ((octetValue < 16) ? "0" : "") + octetValue.toString(16);
+         } else if (subnetSize < 32) { //check even though we don't need them
+           if (octetValue > 0) { return ""; } //way too many numbers
+         } else if (subnetSize == 32) {
+           result += ((octetValue < 16) ? "0" : "") + octetValue.toString(16);
+         }
+         subnetSize -= 8;
+       } else {
+         return "";
+       }
+     }
+
+     return result.toUpperCase();
+   }
+
+-}
+
+
+{-| TODO
+-}
+parseDestination : String -> Maybe String
+parseDestination network =
+    case String.split "/" network of
+        [ netStr, cidrStr ] ->
+            cidrStr
+                |> String.toInt
+                |> Maybe.andThen
+                    (\cidr ->
+                        if cidr > 0 && cidr < 32 then
+                            Just ""
+
+                        else
+                            Nothing
+                    )
+
+        [ netStr ] ->
+            Nothing
+
+        _ ->
+            Nothing
+
+
+parseRouter : String -> Maybe String
+parseRouter network =
+    case String.split "." network of
+        [ a, b, c, d ] ->
+            List.foldl
+                (\octet acc ->
+                    octet
+                        |> String.toInt
+                        |> Maybe.andThen
+                            (\val ->
+                                if val >= 0 && val <= 255 then
+                                    let
+                                        pre =
+                                            if val < 16 then
+                                                "0"
+
+                                            else
+                                                ""
+
+                                        x =
+                                            pre ++ Base.fromInt Base.b16 val
+                                    in
+                                    Maybe.andThen (\ac -> Just (ac ++ x)) acc
+
+                                else
+                                    Nothing
+                            )
+                )
+                (Just "")
+                [ a, b, c, d ]
+
+        _ ->
+            Nothing
 
 
 
@@ -271,7 +382,7 @@ viewDestination index route =
     let
         attrs =
             case route.destination of
-                Valid val ->
+                Valid val _ ->
                     { text = val, placeholder = Nothing }
 
                 Invalid val errorMessage ->
@@ -295,7 +406,7 @@ viewRouter index route =
     let
         attrs =
             case route.router of
-                Valid val ->
+                Valid val _ ->
                     { text = val, placeholder = Nothing }
 
                 Invalid val errorMessage ->
