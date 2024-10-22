@@ -408,7 +408,8 @@ view model =
             , Element.spacing 20
             , Region.mainContent
             ]
-            [ viewOption121 model
+            [ viewHeader
+            , viewOption121 model
             , viewRoutesTable model
             , viewButtons
             , viewFooter
@@ -416,6 +417,20 @@ view model =
             |> Element.layout []
         ]
     }
+
+
+viewHeader : Element Msg
+viewHeader =
+    Element.column
+        [ Region.heading 1
+        , Element.spacing 5
+        , Element.padding 20
+        , Element.centerX
+        , Font.size 24
+        , Font.bold
+        , Font.color (rgb255 0 0 0)
+        ]
+        [ text "DHCPv4 Option 121 Calculator" ]
 
 
 viewOption121 : Model -> Element Msg
