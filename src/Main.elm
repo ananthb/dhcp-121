@@ -421,7 +421,7 @@ view model =
 
 viewHeader : Element Msg
 viewHeader =
-    Element.column
+    Element.row
         [ Region.heading 1
         , Element.spacing 5
         , Element.padding 20
@@ -430,7 +430,12 @@ viewHeader =
         , Font.bold
         , Font.color (rgb255 0 0 0)
         ]
-        [ text "DHCPv4 Option 121 Calculator" ]
+        [ Element.image []
+            { src = "favicon-96x96.png"
+            , description = "Gear and circuit traces logo"
+            }
+        , text "DHCPv4 Option 121 Calculator"
+        ]
 
 
 viewOption121 : Model -> Element Msg
