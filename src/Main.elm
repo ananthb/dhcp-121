@@ -3,6 +3,8 @@ module Main exposing (main)
 import Array exposing (Array)
 import Base
 import Browser
+import Browser.Dom
+import Browser.Events as Events
 import Browser.Navigation as Nav
 import Element exposing (Element, centerX, fill, padding, px, rgb255, text, width)
 import Element.Background as Background
@@ -10,6 +12,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Element.Region as Region
+import Task
 import Url
 
 
@@ -47,6 +50,7 @@ type alias StaticRoute =
 type alias Model =
     { key : Nav.Key
     , url : Url.Url
+    , device : Element.Device
     , routes : Array StaticRoute
     , option121 : Maybe String
     }
@@ -54,8 +58,8 @@ type alias Model =
 
 newStaticRoute : StaticRoute
 newStaticRoute =
-    { destination = Invalid "" "Enter a classless destination network"
-    , router = Invalid "" "Enter a valid IP address"
+    { destination = Invalid "" "Network"
+    , router = Invalid "" "IP address"
     }
 
 
@@ -69,10 +73,14 @@ init _ url key =
     -- TODO: Parse the URL and set the routes
     ( { key = key
       , url = url
+      , device = { class = Element.Phone, orientation = Element.Portrait }
       , routes = newStaticRoutes
       , option121 = Nothing
       }
-    , Nav.pushUrl key "#"
+    , Cmd.batch
+        [ Nav.pushUrl key "#"
+        , Task.perform GotViewport Browser.Dom.getViewport
+        ]
     )
 
 
@@ -83,6 +91,8 @@ init _ url key =
 type Msg
     = UrlChanged Url.Url
     | LinkClicked Browser.UrlRequest
+    | GotViewport Browser.Dom.Viewport
+    | SetScreenSize Int Int
     | ChangeDestination Int String
     | ChangeRouter Int String
     | AddRoute
@@ -105,6 +115,28 @@ update msg model =
 
                 Browser.External href ->
                     ( model, Nav.load href )
+
+        GotViewport viewport ->
+            ( { model
+                | device =
+                    Element.classifyDevice
+                        { width = floor viewport.viewport.width
+                        , height = floor viewport.viewport.height
+                        }
+              }
+            , Cmd.none
+            )
+
+        SetScreenSize width height ->
+            ( { model
+                | device =
+                    Element.classifyDevice
+                        { width = width
+                        , height = height
+                        }
+              }
+            , Cmd.none
+            )
 
         ChangeDestination index value ->
             case Array.get index model.routes of
@@ -391,7 +423,7 @@ parseRouter network =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Sub.batch [ Events.onResize SetScreenSize ]
 
 
 
@@ -408,7 +440,7 @@ view model =
             , Element.spacing 20
             , Region.mainContent
             ]
-            [ viewHeader
+            [ viewHeader model.device
             , viewOption121 model
             , viewRoutesTable model
             , viewButtons
@@ -419,23 +451,35 @@ view model =
     }
 
 
-viewHeader : Element Msg
-viewHeader =
-    Element.row
-        [ Region.heading 1
-        , Element.spacing 5
-        , Element.padding 20
-        , Element.centerX
-        , Font.size 24
-        , Font.bold
-        , Font.color (rgb255 0 0 0)
-        ]
-        [ Element.image []
-            { src = "favicon-96x96.png"
-            , description = "Gear and circuit traces logo"
-            }
-        , text "DHCPv4 Option 121 Calculator"
-        ]
+viewHeader : Element.Device -> Element Msg
+viewHeader device =
+    let
+        attrs =
+            [ Element.spacing 5
+            , Element.padding 20
+            , Element.centerX
+            ]
+
+        children =
+            [ Element.image [ Element.centerX ]
+                { src = "favicon-96x96.png"
+                , description = "Circuit traces & gear logo"
+                }
+            , text "DHCPv4 Option 121 Calculator"
+                |> Element.el
+                    [ Region.heading 1
+                    , Font.size 24
+                    , Font.bold
+                    , Font.color (rgb255 0 0 0)
+                    ]
+            ]
+    in
+    case device.class of
+        Element.Phone ->
+            Element.column attrs children
+
+        _ ->
+            Element.row attrs children
 
 
 viewOption121 : Model -> Element Msg
