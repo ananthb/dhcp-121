@@ -6,7 +6,7 @@ import Browser
 import Browser.Dom
 import Browser.Events as Events
 import Browser.Navigation as Nav
-import Element exposing (Element, centerX, fill, padding, px, rgb255, text, width)
+import Element exposing (Element, centerX, padding, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -430,6 +430,41 @@ subscriptions _ =
 -- VIEW
 
 
+black : Element.Color
+black =
+    Element.rgb255 0 0 0
+
+
+cardinal : Element.Color
+cardinal =
+    Element.rgb255 196 30 58
+
+
+white : Element.Color
+white =
+    Element.rgb255 255 255 255
+
+
+bluegreen : Element.Color
+bluegreen =
+    Element.rgb255 8 143 143
+
+
+crimson : Element.Color
+crimson =
+    Element.rgb255 129 65 65
+
+
+darkgreen : Element.Color
+darkgreen =
+    Element.rgb255 2 48 32
+
+
+grey : Element.Color
+grey =
+    Element.rgb255 128 128 128
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title = "DHCPv4 Option 121 Calculator"
@@ -470,7 +505,7 @@ viewHeader device =
                     [ Region.heading 1
                     , Font.size 24
                     , Font.bold
-                    , Font.color (rgb255 0 0 0)
+                    , Font.color black
                     ]
             ]
     in
@@ -553,7 +588,7 @@ viewDestination index route =
     , label = Input.labelHidden "Destination"
     , placeholder = attrs.placeholder
     }
-        |> Input.text [ width (px 200) ]
+        |> Input.text [ width <| Element.px 200 ]
 
 
 viewRouter : Int -> StaticRoute -> Element Msg
@@ -577,7 +612,7 @@ viewRouter index route =
     , label = Input.labelHidden "Router"
     , placeholder = attrs.placeholder
     }
-        |> Input.text [ width fill ]
+        |> Input.text [ width Element.fill ]
 
 
 viewDeleteButton : Int -> StaticRoute -> Element Msg
@@ -585,8 +620,8 @@ viewDeleteButton index _ =
     Input.button
         [ padding 12
         , Border.rounded 3
-        , Background.color (rgb255 196 30 58)
-        , Font.color (rgb255 255 255 255)
+        , Background.color cardinal
+        , Font.color white
         ]
         { onPress = Just (DeleteRoute index)
         , label = text "Delete"
@@ -601,8 +636,8 @@ viewButtons =
             [ padding 12
             , Border.rounded 3
             , Border.solid
-            , Background.color (rgb255 8 143 143)
-            , Font.color (rgb255 255 255 255)
+            , Background.color bluegreen
+            , Font.color white
             ]
             { onPress = Just AddRoute
             , label = text "Add Route"
@@ -611,8 +646,8 @@ viewButtons =
             [ padding 12
             , Border.rounded 3
             , Border.solid
-            , Background.color (rgb255 129 65 65)
-            , Font.color (rgb255 255 255 255)
+            , Background.color crimson
+            , Font.color white
             ]
             { onPress = Just ResetRoutes
             , label = text "Reset"
@@ -624,7 +659,7 @@ viewFooter : Element Msg
 viewFooter =
     let
         linkAttrs =
-            [ Font.color <| rgb255 2 48 32
+            [ Font.color darkgreen
             , Font.underline
             ]
     in
@@ -633,7 +668,7 @@ viewFooter =
         , Element.spacing 5
         , Element.padding 20
         , Font.size 14
-        , Font.color (rgb255 128 128 128)
+        , Font.color grey
         , Font.light
         ]
         [ Element.row []
