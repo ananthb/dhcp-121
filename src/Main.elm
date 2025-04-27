@@ -59,8 +59,8 @@ type alias Model =
 
 newStaticRoute : StaticRoute
 newStaticRoute =
-    { destination = Invalid "" "Network"
-    , router = Invalid "" "IP address"
+    { destination = Invalid "" "Enter a destination subnet"
+    , router = Invalid "" "Enter a router IP address"
     }
 
 
@@ -79,7 +79,6 @@ init _ url key =
       , option121 = Nothing
       }
     , Task.perform GotViewport Browser.Dom.getViewport
-        
     )
 
 
@@ -619,20 +618,17 @@ viewDestination index route =
         attrs =
             case route.destination of
                 Valid val _ ->
-                    { text = val, placeholder = Nothing }
+                    { text = val, label = Input.labelHidden "Destination" }
 
                 Invalid val errorMessage ->
                     { text = val
-                    , placeholder =
-                        text errorMessage
-                            |> Input.placeholder []
-                            |> Just
+                    , label = Input.labelBelow [] (text errorMessage)
                     }
     in
     { onChange = ChangeDestination index
     , text = attrs.text
-    , label = Input.labelHidden "Destination"
-    , placeholder = attrs.placeholder
+    , label = attrs.label
+    , placeholder = text "Destination subnet" |> Input.placeholder [] |> Just
     }
         |> Input.text [ width <| Element.px 200 ]
 
@@ -643,20 +639,17 @@ viewRouter index route =
         attrs =
             case route.router of
                 Valid val _ ->
-                    { text = val, placeholder = Nothing }
+                    { text = val, label = Input.labelHidden "Router" }
 
                 Invalid val errorMessage ->
                     { text = val
-                    , placeholder =
-                        text errorMessage
-                            |> Input.placeholder []
-                            |> Just
+                    , label = Input.labelBelow [] (text errorMessage)
                     }
     in
     { onChange = ChangeRouter index
     , text = attrs.text
-    , label = Input.labelHidden "Router"
-    , placeholder = attrs.placeholder
+    , label = attrs.label
+    , placeholder = text "Router IP address" |> Input.placeholder [] |> Just
     }
         |> Input.text [ width Element.fill ]
 

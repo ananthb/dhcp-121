@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "elm": "^0.19.1-6",
+    "http-server": "^14.1.1",
     "wrangler": "^4.13.2"
   },
   "type": "module",
