@@ -1,3 +1,5 @@
 # https://numtide.github.io/devshell
 [[commands]]
 package = "elmPackages.elm"
+[[commands]]
+package = "nodejs_22"

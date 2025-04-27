@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "elm": "^0.19.1-6",
+    "wrangler": "^4.13.2"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "elm make src/Main.elm --output=public/app.js --optimize",
+    "deploy": "wrangler pages deploy"
+  }
+}
