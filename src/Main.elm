@@ -443,7 +443,11 @@ viewHeader device =
             ]
 
         children =
-            [ Element.image [ Element.centerX ]
+            [ Element.image
+                [ Element.centerX
+                , Element.px 96 |> Element.width
+                , Element.px 96 |> Element.height
+                ]
                 { src = "favicon-96x96.png"
                 , description = "Circuit traces & gear logo"
                 }
