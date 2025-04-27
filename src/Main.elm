@@ -467,16 +467,22 @@ viewHeader device =
 viewOption121 : Model -> Element Msg
 viewOption121 model =
     let
-        option121 =
-            case model.option121 of
-                Just val ->
-                    text val
+        attrs =
+            [ Element.spacing 20
+            , padding 20
+            , centerX
+            , Border.solid
+            , Border.rounded 3
+            , Border.color grey
+            , Border.width 1
+            ]
 
-                Nothing ->
-                    text "Some routes are invalid"
+        opt =
+            model.option121
+                |> Maybe.map (\o -> "Option 121: " ++ o)
+                |> Maybe.withDefault "Some routes are invalid"
     in
-    [ option121 ]
-        |> Element.column [ centerX, padding 20, Element.spacing 20 ]
+    Element.column attrs [ text opt ]
 
 
 viewRoutesTable : Model -> Element Msg
