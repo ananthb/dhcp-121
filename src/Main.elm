@@ -2,7 +2,6 @@ module Main exposing (main)
 
 import Array exposing (Array)
 import Base
-import Bitwise
 import Browser
 import Browser.Dom
 import Browser.Events as Events
@@ -284,63 +283,9 @@ updateOption121 key routes =
             ( Nothing, Cmd.none )
 
 
-
-{- Refer this for the function below
-
-   function parseNetwork(ip) { //null if empty; "" if error; otherwise hex
-     if (ip == "") { return null; }
-
-     var subnetSize = 32;
-     var parts = ip.split('/');
-     if (parts.length == 2) {
-       if (/^[0-9]+$/.test(parts[1].trim())) {
-         subnetSize  = parseInt(parts[1], 10);
-         if ((subnetSize < 1) || (subnetSize > 32)) { return ""; }
-       } else {
-         return "";
-       }
-     } else if (parts.length > 2) {
-       return "";
-     }
-
-     var result = ((subnetSize < 16) ? "0" : "") + subnetSize.toString(16);
-
-     var octetCount = parseInt((subnetSize + 7) / 8);
-
-     var octets = parts[0].trim().split('.');
-     if (octets.length != 4) {  return ""; }
-
-     for(var i=0; i<4; i++) {
-       if (/^[0-9]+$/.test(octets[i])) {
-         var octetValue = parseInt(octets[i], 10);
-         if ((octetValue < 0) || (octetValue > 255)) { return ""; }
-         if ((subnetSize > 0) && (subnetSize < 32)) {
-           var octetValueRem = (octetValue << subnetSize) & 0xFF; //remove network bits
-           if (octetValueRem > 0) { return "" ; } //invalid subnet bitmask - some network bits remaining
-           result += ((octetValue < 16) ? "0" : "") + octetValue.toString(16);
-         } else if (subnetSize < 32) { //check even though we don't need them
-           if (octetValue > 0) { return ""; } //way too many numbers
-         } else if (subnetSize == 32) {
-           result += ((octetValue < 16) ? "0" : "") + octetValue.toString(16);
-         }
-         subnetSize -= 8;
-       } else {
-         return "";
-       }
-     }
-
-     return result.toUpperCase();
-   }
-
--}
-
-
-{-| TODO: Parse this as a subnet instead of a plain IP
-
-We gotta take the subnet into account.
-
-So 10.10.10.0/24 is valid but 10.10.10.1/24 is not.let
-
+{-| Parse the destination network in CIDR notation into a hex string.
+The CIDR notation is converted to a hex string and prepended to the
+destination network hex string.
 -}
 parseDestination : String -> Maybe String
 parseDestination network =
@@ -350,27 +295,21 @@ parseDestination network =
                 |> String.toInt
                 |> Maybe.andThen
                     (\cidr ->
-                        if cidr > 0 && cidr <= 32 then
-                            parseRouter netStr
-                                |> Maybe.andThen
-                                    (\hex ->
-                                        if isValidNetworkAddress netStr cidr then
-                                            let
-                                                pre =
-                                                    if cidr < 16 then
-                                                        "0"
+                        if cidr > 0 && cidr < 32 then
+                            let
+                                pre =
+                                    if cidr < 16 then
+                                        "0"
 
-                                                    else
-                                                        ""
+                                    else
+                                        ""
 
-                                                cidrHex =
-                                                    pre ++ Base.fromInt Base.b16 cidr
-                                            in
-                                            Just (cidrHex ++ hex)
-
-                                        else
-                                            Nothing
-                                    )
+                                cidrHex =
+                                    pre ++ Base.fromInt Base.b16 cidr
+                            in
+                            netStr
+                                |> parseRouter
+                                |> Maybe.andThen (\hex -> Just (cidrHex ++ hex))
 
                         else
                             Nothing
@@ -379,13 +318,17 @@ parseDestination network =
         [ netStr ] ->
             netStr
                 |> parseRouter
-                -- /32 is the default subnet mask which is always a valid network address
+                -- /32 is the default subnet mask which
                 |> Maybe.andThen (\hex -> Just ("20" ++ hex))
 
         _ ->
             Nothing
 
 
+{-| Parse the router IP address into a hex string.
+The router IP address is converted to a hex string and prepended to the
+destination network hex string.
+-}
 parseRouter : String -> Maybe String
 parseRouter network =
     case String.split "." network of
@@ -419,47 +362,6 @@ parseRouter network =
 
         _ ->
             Nothing
-
-
-isValidNetworkAddress : String -> Int -> Bool
-isValidNetworkAddress ipString cidr =
-    case String.split "." ipString of
-        [ aStr, bStr, cStr, dStr ] ->
-            String.toInt aStr
-                |> Maybe.andThen
-                    (\a ->
-                        String.toInt bStr
-                            |> Maybe.andThen
-                                (\b ->
-                                    String.toInt cStr
-                                        |> Maybe.andThen
-                                            (\c ->
-                                                String.toInt dStr
-                                                    |> Maybe.map
-                                                        (\d ->
-                                                            let
-                                                                ipInt =
-                                                                    (a * 256 ^ 3) + (b * 256 ^ 2) + (c * 256) + d
-
-                                                                maskInt =
-                                                                    if cidr == 0 then
-                                                                        0
-
-                                                                    else
-                                                                        Bitwise.shiftLeftBy (32 - cidr) (Bitwise.complement 0)
-
-                                                                networkAddressInt =
-                                                                    Bitwise.and ipInt maskInt
-                                                            in
-                                                            ipInt == networkAddressInt
-                                                        )
-                                            )
-                                )
-                    )
-                |> Maybe.withDefault False
-
-        _ ->
-            False
 
 
 
