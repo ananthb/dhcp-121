@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Array exposing (Array)
 import Base
+import Bitwise
 import Browser
 import Browser.Dom
 import Browser.Events as Events
@@ -352,21 +353,27 @@ parseDestination network =
                 |> String.toInt
                 |> Maybe.andThen
                     (\cidr ->
-                        if cidr > 0 && cidr < 32 then
-                            let
-                                pre =
-                                    if cidr < 16 then
-                                        "0"
+                        if cidr > 0 && cidr <= 32 then
+                            parseRouter netStr
+                                |> Maybe.andThen
+                                    (\hex ->
+                                        if isValidNetworkAddress netStr cidr then
+                                            let
+                                                pre =
+                                                    if cidr < 16 then
+                                                        "0"
 
-                                    else
-                                        ""
+                                                    else
+                                                        ""
 
-                                cidrHex =
-                                    pre ++ Base.fromInt Base.b16 cidr
-                            in
-                            netStr
-                                |> parseRouter
-                                |> Maybe.andThen (\hex -> Just (cidrHex ++ hex))
+                                                cidrHex =
+                                                    pre ++ Base.fromInt Base.b16 cidr
+                                            in
+                                            Just (cidrHex ++ hex)
+
+                                        else
+                                            Nothing
+                                    )
 
                         else
                             Nothing
@@ -375,7 +382,7 @@ parseDestination network =
         [ netStr ] ->
             netStr
                 |> parseRouter
-                -- /32 is the default subnet mask which
+                -- /32 is the default subnet mask which is always a valid network address
                 |> Maybe.andThen (\hex -> Just ("20" ++ hex))
 
         _ ->
@@ -415,6 +422,47 @@ parseRouter network =
 
         _ ->
             Nothing
+
+
+isValidNetworkAddress : String -> Int -> Bool
+isValidNetworkAddress ipString cidr =
+    case String.split "." ipString of
+        [ aStr, bStr, cStr, dStr ] ->
+            String.toInt aStr
+                |> Maybe.andThen
+                    (\a ->
+                        String.toInt bStr
+                            |> Maybe.andThen
+                                (\b ->
+                                    String.toInt cStr
+                                        |> Maybe.andThen
+                                            (\c ->
+                                                String.toInt dStr
+                                                    |> Maybe.map
+                                                        (\d ->
+                                                            let
+                                                                ipInt =
+                                                                    (a * 256 ^ 3) + (b * 256 ^ 2) + (c * 256) + d
+
+                                                                maskInt =
+                                                                    if cidr == 0 then
+                                                                        0
+
+                                                                    else
+                                                                        Bitwise.shiftLeftBy (32 - cidr) (Bitwise.complement 0)
+
+                                                                networkAddressInt =
+                                                                    Bitwise.and ipInt maskInt
+                                                            in
+                                                            ipInt == networkAddressInt
+                                                        )
+                                            )
+                                )
+                    )
+                |> Maybe.withDefault False
+
+        _ ->
+            False
 
 
 
