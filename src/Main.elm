@@ -78,10 +78,8 @@ init _ url key =
       , routes = newStaticRoutes
       , option121 = Nothing
       }
-    , Cmd.batch
-        [ Nav.pushUrl key "#"
-        , Task.perform GotViewport Browser.Dom.getViewport
-        ]
+    , Task.perform GotViewport Browser.Dom.getViewport
+        
     )
 
 
@@ -281,10 +279,10 @@ updateOption121 key routes =
     in
     case Array.foldl calc (Just "") routes of
         Just opt ->
-            ( Just opt, Nav.pushUrl key <| "#" ++ opt )
+            ( Just opt, Nav.pushUrl key opt )
 
         Nothing ->
-            ( Nothing, Nav.pushUrl key "#" )
+            ( Nothing, Cmd.none )
 
 
 
