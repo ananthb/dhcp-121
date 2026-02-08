@@ -284,8 +284,8 @@ updateOption121 key routes =
 
 
 {-| Parse the destination network in CIDR notation into a hex string.
-The CIDR notation is converted to a hex string and prepended to the
-destination network hex string.
+Per RFC 3442, only the significant octets of the network address are included.
+The number of significant octets is ceiling(prefix_length / 8).
 -}
 parseDestination : String -> Maybe String
 parseDestination network =
@@ -295,73 +295,83 @@ parseDestination network =
                 |> String.toInt
                 |> Maybe.andThen
                     (\cidr ->
-                        if cidr > 0 && cidr < 32 then
+                        if cidr >= 0 && cidr <= 32 then
                             let
-                                pre =
-                                    if cidr < 16 then
-                                        "0"
-
-                                    else
-                                        ""
-
                                 cidrHex =
-                                    pre ++ Base.fromInt Base.b16 cidr
+                                    toHexByte cidr
+
+                                significantOctets =
+                                    (cidr + 7) // 8
                             in
                             netStr
-                                |> parseRouter
-                                |> Maybe.andThen (\hex -> Just (cidrHex ++ hex))
+                                |> parseNetworkOctets significantOctets
+                                |> Maybe.map (\hex -> cidrHex ++ hex)
 
                         else
                             Nothing
                     )
 
         [ netStr ] ->
+            -- No CIDR specified, treat as /32 (host route)
             netStr
                 |> parseRouter
-                -- /32 is the default subnet mask which
-                |> Maybe.andThen (\hex -> Just ("20" ++ hex))
+                |> Maybe.map (\hex -> "20" ++ hex)
 
         _ ->
             Nothing
 
 
-{-| Parse the router IP address into a hex string.
-The router IP address is converted to a hex string and prepended to the
-destination network hex string.
+{-| Parse an IP address and return only the first n octets as hex.
+-}
+parseNetworkOctets : Int -> String -> Maybe String
+parseNetworkOctets n network =
+    case String.split "." network of
+        [ a, b, c, d ] ->
+            [ a, b, c, d ]
+                |> List.take n
+                |> List.foldl
+                    (\octet acc ->
+                        acc
+                            |> Maybe.andThen
+                                (\accHex ->
+                                    octet
+                                        |> String.toInt
+                                        |> Maybe.andThen
+                                            (\val ->
+                                                if val >= 0 && val <= 255 then
+                                                    Just (accHex ++ toHexByte val)
+
+                                                else
+                                                    Nothing
+                                            )
+                                )
+                    )
+                    (Just "")
+
+        _ ->
+            Nothing
+
+
+{-| Convert a value 0-255 to a two-character hex string.
+-}
+toHexByte : Int -> String
+toHexByte val =
+    let
+        pre =
+            if val < 16 then
+                "0"
+
+            else
+                ""
+    in
+    pre ++ Base.fromInt Base.b16 val
+
+
+{-| Parse the router IP address into a hex string (all 4 octets).
 -}
 parseRouter : String -> Maybe String
 parseRouter network =
-    case String.split "." network of
-        [ a, b, c, d ] ->
-            List.foldl
-                (\octet acc ->
-                    octet
-                        |> String.toInt
-                        |> Maybe.andThen
-                            (\val ->
-                                if val >= 0 && val <= 255 then
-                                    let
-                                        pre =
-                                            if val < 16 then
-                                                "0"
-
-                                            else
-                                                ""
-
-                                        x =
-                                            pre ++ Base.fromInt Base.b16 val
-                                    in
-                                    Maybe.andThen (\ac -> Just (ac ++ x)) acc
-
-                                else
-                                    Nothing
-                            )
-                )
-                (Just "")
-                [ a, b, c, d ]
-
-        _ ->
-            Nothing
+    parseNetworkOctets 4 network
 
 
 
