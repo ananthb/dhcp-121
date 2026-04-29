@@ -3,6 +3,8 @@
 Calculate values for the Classless Static Route Option for
 Dynamic Host Configuration Protocol (DHCP) version 4.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/ananthb/dhcp-121)
+
 ## Build
 
 Install [Elm](https://elm-lang.org/).
